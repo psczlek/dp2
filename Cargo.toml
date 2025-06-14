@@ -1,0 +1,18 @@
+[package]
+name = "dp2"
+version = "0.0.1"
+description = "Print files in hex and ascii"
+license = "MIT"
+edition = "2024"
+
+[dependencies]
+colored = "3.0.0"
+resolve-path = "0.1.0"
+
+[profile.release]
+opt-level = 3
+debug = false
+strip = true
+lto = true
+codegen-units = 1
+panic = "abort"
