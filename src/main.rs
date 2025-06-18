@@ -16,7 +16,7 @@ fn main() -> ExitCode {
     let biname = args.remove(0);
     if args.is_empty() {
         println!(
-            "{} {} [file(s)]...",
+            "Print files in hex and ascii\n\n{} {} [file(s)]...",
             "usage:".green().bold(),
             biname.cyan().bold(),
         );
@@ -96,7 +96,7 @@ fn hexdump(path: &str) -> io::Result<()> {
             }
 
             for byte in chunk {
-                if *byte >= 0x21 && *byte <= 0x7e {
+                if *byte >= 0x20 && *byte <= 0x7e {
                     printables.push(*byte as char);
                 } else {
                     printables.push('.');
@@ -129,7 +129,7 @@ fn hexdump(path: &str) -> io::Result<()> {
     }
 
     println!(
-        "\n{}: {} bytes, {:.4} KiB {:.4} MiB\n",
+        "\n{}: {} bytes, {:.4} KiB {:.4} MiB",
         path,
         foff,
         (foff as f64 / 1024.0),
