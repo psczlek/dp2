@@ -3,12 +3,9 @@ use resolve_path::PathResolveExt;
 use std::cmp;
 use std::collections::VecDeque;
 use std::env;
-use std::fs;
-use std::fs::File;
-use std::io;
-use std::io::ErrorKind;
-use std::os::unix::fs::FileExt;
-use std::os::unix::fs::MetadataExt;
+use std::fs::{self, File};
+use std::io::{self, ErrorKind};
+use std::os::unix::fs::{FileExt, MetadataExt};
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
@@ -43,7 +40,7 @@ fn main() -> ExitCode {
                     println!("{}: '{}' - permission denied", "note".yellow(), arg);
                     continue;
                 }
-                _ => panic!(),
+                _ => panic!("{err}"),
             },
         }
     }
@@ -57,9 +54,7 @@ fn main() -> ExitCode {
         return ExitCode::FAILURE;
     }
 
-    while !dumpq.is_empty() {
-        let path = dumpq.pop_front().unwrap();
-
+    while let Some(path) = dumpq.pop_front() {
         println!(
             "{delim:->width$} {path}\n",
             delim = '-',
@@ -84,22 +79,21 @@ fn hexdump(path: &str) -> io::Result<()> {
         let mut carry = 0;
 
         for chunk in buf.chunks(16) {
-            let mut printables = String::new();
-            let mut bytes_printed = 0;
-
-            print!("{boff:012x}: ");
-
             if chunk.iter().all(|byte| *byte == 0x00) {
                 println!("00...");
                 boff += 16;
                 continue;
             }
 
+            let mut printables = String::new();
+            let mut bytes_printed = 0;
+
+            print!("{boff:012x}: ");
+
             for byte in chunk {
-                if *byte >= 0x20 && *byte <= 0x7e {
-                    printables.push(*byte as char);
-                } else {
-                    printables.push('.');
+                match *byte {
+                    0x20..=0x7e => printables.push(*byte as char),
+                    _ => printables.push('.'),
                 }
 
                 if bytes_printed == 8 {
