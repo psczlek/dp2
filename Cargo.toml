@@ -1,6 +1,6 @@
 [package]
 name = "dp"
-version = "0.0.2"
+version = "0.0.3"
 description = "Print files in hex and ascii"
 license = "MIT"
 edition = "2024"

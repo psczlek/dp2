@@ -1,6 +1,6 @@
 use std::env;
-use std::fs::{self, File};
-use std::io::{self, Read};
+use std::fs::File;
+use std::io::{self, Read, Write};
 use std::os::unix::fs::FileExt;
 use std::path::Path;
 use std::process::ExitCode;
@@ -9,8 +9,13 @@ fn main() -> ExitCode {
     let res = run();
     match res {
         Ok(_) => ExitCode::SUCCESS,
-        Err(err) => {
-            eprintln!("error: {err}");
+        Err(e) => {
+            // Ignore
+            if e.kind() == io::ErrorKind::BrokenPipe {
+                return ExitCode::SUCCESS;
+            }
+
+            eprintln!("error: {e}");
             ExitCode::FAILURE
         }
     }
@@ -24,26 +29,27 @@ fn run() -> io::Result<()> {
     }
 
     for file in args.iter().skip(1) {
-        match fs::metadata(file) {
-            Ok(metadata) if !metadata.is_file() => eprintln!("{file}: not a regular file"),
-            Ok(_) => hexdump_file(file)?,
-            Err(err) => eprintln!("{file}: {err}"),
-        }
+        hexdump_file(file)?;
     }
 
     Ok(())
 }
 
-fn hexdump_file<P: AsRef<Path>>(path: P) -> io::Result<()> {
+fn hexdump_file(path: impl AsRef<Path>) -> io::Result<()> {
     let file = File::open(&path)?;
+
     let metadata = file.metadata()?;
+
     let mut remaining = metadata.len();
+
     let mut offset = 0;
     let mut buf = vec![0u8; 16 * 1024];
 
+    let mut stdout = io::stdout();
+
     let display_path = path.as_ref().display();
 
-    println!("{:-<width$} {display_path}", "", width = 77);
+    stdout.write_all(format!("{:-<width$} {display_path}\n", "", width = 77).as_bytes())?;
 
     while remaining > 0 {
         let n = file.read_at(&mut buf, offset)?;
@@ -51,24 +57,30 @@ fn hexdump_file<P: AsRef<Path>>(path: P) -> io::Result<()> {
             break;
         }
 
-        hexdump(&buf[..n], offset)?;
+        hexdump(&mut stdout, offset, &buf[..n])?;
+
         offset += n as u64;
         remaining -= n as u64;
     }
 
-    println!(
-        "\n{}: {} bytes, {:.4} KiB {:.4} MiB",
-        display_path,
-        offset,
-        offset as f64 / 1024.0,
-        offset as f64 / 1024.0 / 1024.0
-    );
+    stdout.write_all(
+        format!(
+            "\n{}: {} bytes, {:.4} KiB {:.4} MiB\n",
+            display_path,
+            offset,
+            offset as f64 / 1024.0,
+            offset as f64 / 1024.0 / 1024.0
+        )
+        .as_bytes(),
+    )?;
 
     Ok(())
 }
 
 fn hexdump_stdin() -> io::Result<()> {
     let mut stdin = io::stdin();
+    let mut stdout = io::stdout();
+
     let mut buf = vec![0u8; 16 * 1024];
     let mut offset = 0;
 
@@ -78,16 +90,16 @@ fn hexdump_stdin() -> io::Result<()> {
             break;
         }
 
-        hexdump(&buf[..n], offset)?;
+        hexdump(&mut stdout, offset, &buf[..n])?;
         offset += n as u64;
     }
 
     Ok(())
 }
 
-fn hexdump(buf: &[u8], mut offset: u64) -> io::Result<()> {
+fn hexdump(out: &mut impl Write, mut offset: u64, buf: &[u8]) -> io::Result<()> {
     for chunk in buf.chunks(16) {
-        let mut line = format!("{offset:08x}:  ");
+        let mut line = format!("{offset:#012x}:  ");
         let mut ascii = String::new();
 
         for (i, byte) in chunk.iter().enumerate() {
@@ -98,6 +110,16 @@ fn hexdump(buf: &[u8], mut offset: u64) -> io::Result<()> {
             line.push_str(&format!("{:02x} ", byte));
 
             let ch = match byte {
+                // Null
+                // 0x00 => todo!(),
+                // Space
+                // 0x20 => todo!(),
+                // Punctuation
+                // 0x21..=0x2f | 0x3a..=0x40 | 0x5b..=0x60 | 0x7b..=0x7e => todo!(),
+                // Digits
+                // 0x30..=0x39 => todo!(),
+                // Letters
+                // 0x41..=0x5a | 0x61..=0x7a => todo!(),
                 0x20..=0x7e => *byte as char,
                 _ => '.',
             };
@@ -110,7 +132,7 @@ fn hexdump(buf: &[u8], mut offset: u64) -> io::Result<()> {
             line.push_str(&" ".repeat(pad_spaces));
         }
 
-        println!("{line} {ascii}");
+        out.write_all(format!("{line} {ascii}\n").as_bytes())?;
         offset += 16;
     }
 
