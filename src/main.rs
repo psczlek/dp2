@@ -110,16 +110,6 @@ fn hexdump(out: &mut impl Write, mut offset: u64, buf: &[u8]) -> io::Result<()> 
             line.push_str(&format!("{:02x} ", byte));
 
             let ch = match byte {
-                // Null
-                // 0x00 => todo!(),
-                // Space
-                // 0x20 => todo!(),
-                // Punctuation
-                // 0x21..=0x2f | 0x3a..=0x40 | 0x5b..=0x60 | 0x7b..=0x7e => todo!(),
-                // Digits
-                // 0x30..=0x39 => todo!(),
-                // Letters
-                // 0x41..=0x5a | 0x61..=0x7a => todo!(),
                 0x20..=0x7e => *byte as char,
                 _ => '.',
             };
